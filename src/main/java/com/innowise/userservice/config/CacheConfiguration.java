@@ -15,6 +15,7 @@ import java.time.Duration;
 @Configuration
 @EnableCaching
 public class CacheConfiguration {
+  private final int TTL_MINUTES = 10;
 
   @Bean
   public RedisTemplate<String, Object> redisTemplate(
@@ -36,7 +37,7 @@ public class CacheConfiguration {
           LettuceConnectionFactory connectionFactory
   ) {
     RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-            .entryTtl(Duration.ofMinutes(10))
+            .entryTtl(Duration.ofMinutes(TTL_MINUTES))
             .disableCachingNullValues()
             .serializeKeysWith(
                     RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.string()))

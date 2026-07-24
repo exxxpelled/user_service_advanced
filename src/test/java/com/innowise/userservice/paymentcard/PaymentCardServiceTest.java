@@ -2,10 +2,11 @@ package com.innowise.userservice.paymentcard;
 
 import com.innowise.userservice.paymentcard.dto.CreatePaymentCardRequest;
 import com.innowise.userservice.paymentcard.dto.PaymentCardResponse;
-import com.innowise.userservice.paymentcard.exception.IlligalPaymentCardAmountException;
+import com.innowise.userservice.paymentcard.exception.IllegalPaymentCardAmountException;
 import com.innowise.userservice.paymentcard.exception.PaymentCardNotFoundException;
 import com.innowise.userservice.user.UserEntity;
-import com.innowise.userservice.user.UserRepository;
+import com.innowise.userservice.user.UserService;
+import com.innowise.userservice.user.dto.UserResponse;
 import com.innowise.userservice.user.exception.UserNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,12 +44,13 @@ class PaymentCardServiceTest {
   private PaymentCardMapper paymentCardMapper;
 
   @Mock
-  private UserRepository userRepository;
+  private UserService userService;
 
   @InjectMocks
   private PaymentCardService paymentCardService;
 
   private UserEntity userEntity;
+  private UserResponse userResponse;
   private PaymentCardEntity paymentCardEntity;
   private PaymentCardResponse paymentCardResponse;
   private CreatePaymentCardRequest createPaymentCardRequest;
@@ -72,6 +74,16 @@ class PaymentCardServiceTest {
     userEntity.setEmail("Ivan.Ivanov@example.com");
     userEntity.setActive(true);
     userEntity.setCards(new ArrayList<>());
+
+    userResponse = new UserResponse(
+            userId,
+            "Ivan",
+            "Ivanov",
+            birthDate,
+            "Ivan.Ivanov@example.com",
+            true,
+            new ArrayList<>()
+    );
 
     paymentCardEntity = new PaymentCardEntity();
     paymentCardEntity.setId(cardId);
@@ -98,8 +110,8 @@ class PaymentCardServiceTest {
 
   @Test
   void createShouldReturnPaymentCardDtoWhenUserExistsAndHasLessThanMaxCards() {
-    when(userRepository.findById(userId)).thenReturn(Optional.of(userEntity));
-    when(paymentCardMapper.toEntity(createPaymentCardRequest, userEntity)).thenReturn(paymentCardEntity);
+    when(userService.getById(userId)).thenReturn(userResponse);
+    when(paymentCardMapper.toEntity(createPaymentCardRequest, userResponse)).thenReturn(paymentCardEntity);
     when(paymentCardRepository.save(paymentCardEntity)).thenReturn(paymentCardEntity);
     when(paymentCardMapper.toDto(paymentCardEntity)).thenReturn(paymentCardResponse);
 
@@ -112,21 +124,21 @@ class PaymentCardServiceTest {
     assertThat(result.holder()).isEqualTo("Ivan Ivanov");
     assertThat(result.active()).isTrue();
 
-    verify(userRepository).findById(userId);
-    verify(paymentCardMapper).toEntity(createPaymentCardRequest, userEntity);
+    verify(userService).getById(userId);
+    verify(paymentCardMapper).toEntity(createPaymentCardRequest, userResponse);
     verify(paymentCardRepository).save(paymentCardEntity);
     verify(paymentCardMapper).toDto(paymentCardEntity);
   }
 
   @Test
   void createShouldThrowUserNotFoundExceptionWhenUserIvanovsNotExist() {
-    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+    when(userService.getById(userId)).thenThrow(new UserNotFoundException("User with id=" + userId + " not found"));
 
     assertThatThrownBy(() -> paymentCardService.create(createPaymentCardRequest))
             .isInstanceOf(UserNotFoundException.class)
             .hasMessage("User with id=" + userId + " not found");
 
-    verify(userRepository).findById(userId);
+    verify(userService).getById(userId);
     verify(paymentCardMapper, never()).toEntity(any(), any());
     verify(paymentCardRepository, never()).save(any());
     verify(paymentCardMapper, never()).toDto(any());
@@ -134,21 +146,21 @@ class PaymentCardServiceTest {
 
   @Test
   void createShouldThrowIlligalPaymentCardAmountExceptionWhenUserHasMaxCards() {
-    List<PaymentCardEntity> existingCards = new ArrayList<>();
+    List<PaymentCardResponse> existingCards = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
-      PaymentCardEntity card = new PaymentCardEntity();
-      card.setId((long) (i + 2));
-      existingCards.add(card);
+      existingCards.add(new PaymentCardResponse((long) (i + 2), userId, "1234", "Ivan", expirationDate, true));
     }
-    userEntity.setCards(existingCards);
+    UserResponse userWithMaxCards = new UserResponse(
+            userId, "Ivan", "Ivanov", birthDate, "Ivan.Ivanov@example.com", true, existingCards
+    );
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(userEntity));
+    when(userService.getById(userId)).thenReturn(userWithMaxCards);
 
     assertThatThrownBy(() -> paymentCardService.create(createPaymentCardRequest))
-            .isInstanceOf(IlligalPaymentCardAmountException.class)
+            .isInstanceOf(IllegalPaymentCardAmountException.class)
             .hasMessage("User can have no more than 5 paymentCards");
 
-    verify(userRepository).findById(userId);
+    verify(userService).getById(userId);
     verify(paymentCardMapper, never()).toEntity(any(), any());
     verify(paymentCardRepository, never()).save(any());
     verify(paymentCardMapper, never()).toDto(any());
@@ -156,16 +168,16 @@ class PaymentCardServiceTest {
 
   @Test
   void createShouldSucceedWhenUserHasExactlyMaxCardsMinusOne() {
-    List<PaymentCardEntity> existingCards = new ArrayList<>();
+    List<PaymentCardResponse> existingCards = new ArrayList<>();
     for (int i = 0; i < 4; i++) {
-      PaymentCardEntity card = new PaymentCardEntity();
-      card.setId((long) (i + 2));
-      existingCards.add(card);
+      existingCards.add(new PaymentCardResponse((long) (i + 2), userId, "1234", "Ivan", expirationDate, true));
     }
-    userEntity.setCards(existingCards);
+    UserResponse userWithFourCards = new UserResponse(
+            userId, "Ivan", "Ivanov", birthDate, "Ivan.Ivanov@example.com", true, existingCards
+    );
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(userEntity));
-    when(paymentCardMapper.toEntity(createPaymentCardRequest, userEntity)).thenReturn(paymentCardEntity);
+    when(userService.getById(userId)).thenReturn(userWithFourCards);
+    when(paymentCardMapper.toEntity(createPaymentCardRequest, userWithFourCards)).thenReturn(paymentCardEntity);
     when(paymentCardRepository.save(paymentCardEntity)).thenReturn(paymentCardEntity);
     when(paymentCardMapper.toDto(paymentCardEntity)).thenReturn(paymentCardResponse);
 
@@ -174,8 +186,8 @@ class PaymentCardServiceTest {
     assertThat(result).isNotNull();
     assertThat(result.id()).isEqualTo(cardId);
 
-    verify(userRepository).findById(userId);
-    verify(paymentCardMapper).toEntity(createPaymentCardRequest, userEntity);
+    verify(userService).getById(userId);
+    verify(paymentCardMapper).toEntity(createPaymentCardRequest, userWithFourCards);
     verify(paymentCardRepository).save(paymentCardEntity);
     verify(paymentCardMapper).toDto(paymentCardEntity);
   }
@@ -402,8 +414,8 @@ class PaymentCardServiceTest {
 
   @Test
   void createShouldSetCardWithCorrectUserReference() {
-    when(userRepository.findById(userId)).thenReturn(Optional.of(userEntity));
-    when(paymentCardMapper.toEntity(createPaymentCardRequest, userEntity)).thenReturn(paymentCardEntity);
+    when(userService.getById(userId)).thenReturn(userResponse);
+    when(paymentCardMapper.toEntity(createPaymentCardRequest, userResponse)).thenReturn(paymentCardEntity);
     when(paymentCardRepository.save(paymentCardEntity)).thenReturn(paymentCardEntity);
     when(paymentCardMapper.toDto(paymentCardEntity)).thenReturn(paymentCardResponse);
 
@@ -412,7 +424,7 @@ class PaymentCardServiceTest {
     assertThat(result).isNotNull();
     assertThat(result.userId()).isEqualTo(userId);
 
-    verify(paymentCardMapper).toEntity(createPaymentCardRequest, userEntity);
+    verify(paymentCardMapper).toEntity(createPaymentCardRequest, userResponse);
     verify(paymentCardRepository).save(paymentCardEntity);
   }
 
@@ -440,8 +452,8 @@ class PaymentCardServiceTest {
             "9876543210987654"
     );
 
-    when(userRepository.findById(userId)).thenReturn(Optional.of(userEntity));
-    when(paymentCardMapper.toEntity(newCreateDto, userEntity)).thenReturn(newCardEntity);
+    when(userService.getById(userId)).thenReturn(userResponse);
+    when(paymentCardMapper.toEntity(newCreateDto, userResponse)).thenReturn(newCardEntity);
     when(paymentCardRepository.save(newCardEntity)).thenReturn(newCardEntity);
     when(paymentCardMapper.toDto(newCardEntity)).thenReturn(newCardDto);
 
@@ -451,7 +463,7 @@ class PaymentCardServiceTest {
     assertThat(result.holder()).isEqualTo("Ivan Ivanov");
     assertThat(result.active()).isTrue();
 
-    verify(paymentCardMapper).toEntity(newCreateDto, userEntity);
+    verify(paymentCardMapper).toEntity(newCreateDto, userResponse);
     verify(paymentCardRepository).save(newCardEntity);
     verify(paymentCardMapper).toDto(newCardEntity);
   }

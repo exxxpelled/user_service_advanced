@@ -6,6 +6,7 @@ import com.innowise.userservice.user.dto.UserResponse;
 import com.innowise.userservice.user.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -30,15 +32,13 @@ public class UserService {
     return userMapper.toDto(savedUserEntity);
   }
 
-  @SneakyThrows
   @Transactional(readOnly = true)
   @Cacheable(
           value = "user",
           key = "#id"
   )
   public UserResponse getById(Long id) {
-    UserEntity foundUserEntity = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException("User with id=" + id + " not found"));
+    UserEntity foundUserEntity = findEntityById(id);
     return userMapper.toDto(foundUserEntity);
   }
 
@@ -53,42 +53,40 @@ public class UserService {
             .toList();
   }
 
-  @SneakyThrows
   @Transactional
   @CachePut(
           value = "user",
           key = "#id"
   )
   public UserResponse update(Long id, UpdateUserRequest userToUpdate) {
-    UserEntity foundUserEntity = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException("User with id " + id + " not found"));
-
+    UserEntity foundUserEntity = findEntityById(id);
     userMapper.updateEntityFromDto(userToUpdate, foundUserEntity);
     return userMapper.toDto(foundUserEntity);
   }
 
-  @SneakyThrows
   @Transactional
   @CacheEvict(
           value = "user",
           key = "#id"
   )
   public UserResponse setActiveStatus(Long id, Boolean active) {
-    UserEntity foundUserEntity = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException("User with id=" + id + " not found"));
+    UserEntity foundUserEntity = findEntityById(id);
     foundUserEntity.setActive(active);
     return userMapper.toDto(foundUserEntity);
   }
 
-  @SneakyThrows
   @Transactional
   @CacheEvict(
           value = "user",
           key = "#id"
   )
   public void delete(Long id) {
-    UserEntity foundUserEntity = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException("User with id=" + id + " not found"));
+    UserEntity foundUserEntity = findEntityById(id);
     userRepository.delete(foundUserEntity);
+  }
+
+  private UserEntity findEntityById(Long id) {
+    return userRepository.findById(id)
+            .orElseThrow(() -> new UserNotFoundException("User with id=" + id + " not found"));
   }
 }
