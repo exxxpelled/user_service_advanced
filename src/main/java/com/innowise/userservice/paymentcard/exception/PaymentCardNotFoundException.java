@@ -1,6 +1,6 @@
 package com.innowise.userservice.paymentcard.exception;
 
-public class PaymentCardNotFoundException extends Exception {
+public class PaymentCardNotFoundException extends RuntimeException {
   public PaymentCardNotFoundException() {
   }
 

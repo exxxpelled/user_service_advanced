@@ -17,7 +17,7 @@ public record PaymentCardResponse(
         @NotBlank
         String number,
 
-        @Null
+        @NotBlank
         String holder,
 
         @NotNull
