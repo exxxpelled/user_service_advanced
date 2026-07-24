@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-user-indexes
+      author: Alexander
+      changes:
+        - createIndex:
+            indexName: idx_users_name_surname
+            tableName: users
+            columns:
+              - column:
+                  name: name
+              - column:
+                  name: surname
+        - createIndex:
+            indexName: idx_users_active
+            tableName: users
+            columns:
+              - column:
+                  name: active
