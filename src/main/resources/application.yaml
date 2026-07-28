@@ -16,7 +16,9 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
   cache:
     type: redis
-
+app:
+  cache:
+    ttl-minutes: 10
 ---
 
 spring:
